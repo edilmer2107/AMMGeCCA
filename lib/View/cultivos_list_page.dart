@@ -19,6 +19,7 @@ class _CultivosListPageState extends State<CultivosListPage> {
   late Future<List<Cultivo>> _cultivosFuture;
   Map<int, String> _tipoMap = {};
   Map<int, String> _categoriaMap = {};
+  String? _filtroActivo; // null = todos, 'activo', 'cosechado', 'en_riesgo'
 
   @override
   void initState() {
@@ -52,7 +53,13 @@ class _CultivosListPageState extends State<CultivosListPage> {
 
   Future<List<Cultivo>> _getCultivosFromDB() async {
     final rows = await BasedatoHelper.instance.getAllCultivos();
-    return rows.map((r) => Cultivo.fromMap(r)).toList();
+    final cultivos = rows.map((r) => Cultivo.fromMap(r)).toList();
+
+    if (_filtroActivo == null) {
+      return cultivos;
+    } else {
+      return cultivos.where((c) => c.estado == _filtroActivo).toList();
+    }
   }
 
   void _navigateToForm({Cultivo? cultivo}) async {
@@ -178,33 +185,99 @@ class _CultivosListPageState extends State<CultivosListPage> {
                       ),
                       const SizedBox(height: 16),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          _buildSummaryCard(
-                            '$registrados',
-                            'Registrados',
-                            Colors.cyan,
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4.0,
+                              ),
+                              child: _buildSummaryCard(
+                                '$registrados',
+                                'Registrados',
+                                Colors.cyan,
+                                onTap: () {
+                                  setState(() {
+                                    _filtroActivo = 'activo';
+                                    _loadCultivos();
+                                  });
+                                },
+                                isActive: _filtroActivo == 'activo',
+                              ),
+                            ),
                           ),
-                          _buildSummaryCard(
-                            '$cosechados',
-                            'Cosechados',
-                            Colors.amber,
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4.0,
+                              ),
+                              child: _buildSummaryCard(
+                                '$cosechados',
+                                'Cosechados',
+                                Colors.amber,
+                                onTap: () {
+                                  setState(() {
+                                    _filtroActivo = 'cosechado';
+                                    _loadCultivos();
+                                  });
+                                },
+                                isActive: _filtroActivo == 'cosechado',
+                              ),
+                            ),
                           ),
-                          _buildSummaryCard(
-                            '$enRiesgo',
-                            'En riesgo',
-                            Colors.pink,
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4.0,
+                              ),
+                              child: _buildSummaryCard(
+                                '$enRiesgo',
+                                'En riesgo',
+                                Colors.pink,
+                                onTap: () {
+                                  setState(() {
+                                    _filtroActivo = 'en_riesgo';
+                                    _loadCultivos();
+                                  });
+                                },
+                                isActive: _filtroActivo == 'en_riesgo',
+                              ),
+                            ),
                           ),
                         ],
                       ),
                     ],
                   ),
                 ),
+                // Botón para mostrar todos los cultivos
+                if (_filtroActivo != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 8.0,
+                    ),
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _filtroActivo = null;
+                          _loadCultivos();
+                        });
+                      },
+                      icon: const Icon(Icons.clear_all, size: 18),
+                      label: const Text('Mostrar todos los cultivos'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.green,
+                        side: const BorderSide(color: Colors.green),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                    ),
+                  ),
                 // Lista de cultivos
                 ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 26),
                   itemCount: cultivos.length,
                   itemBuilder: (context, index) {
                     final cultivo = cultivos[index];
@@ -231,35 +304,58 @@ class _CultivosListPageState extends State<CultivosListPage> {
     );
   }
 
-  Widget _buildSummaryCard(String number, String label, Color color) {
-    return Container(
-      width: 100,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color,
+  Widget _buildSummaryCard(
+    String number,
+    String label,
+    Color color, {
+    VoidCallback? onTap,
+    bool isActive = false,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          Text(
-            number,
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
+        child: Container(
+          width: 100,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isActive ? color.withOpacity(0.9) : color,
+            borderRadius: BorderRadius.circular(16),
+            border: isActive ? Border.all(color: Colors.black, width: 2) : null,
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                      color: color.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
           ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
+          child: Column(
+            children: [
+              Text(
+                number,
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -409,17 +505,27 @@ class _CultivosListPageState extends State<CultivosListPage> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 5),
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () {
-                      // Placeholder para marcar riesgo
+                      Navigator.of(context)
+                          .push(
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  CultivoFormPage(cultivo: cultivo),
+                            ),
+                          )
+                          .then((_) {
+                            // Recargar la lista después de marcar el riesgo
+                            _loadCultivos();
+                          });
                     },
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Colors.red),
                     ),
-                    child: Center(
-                      child: const Text(
+                    child: const Center(
+                      child: Text(
                         'Marcar riesgo',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.red),

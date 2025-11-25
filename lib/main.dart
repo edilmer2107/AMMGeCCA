@@ -1,79 +1,102 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
-import 'dart:io';
-import 'package:amgeca/View/cultivos_list_page.dart';
-import 'package:amgeca/View/dashboard_page.dart';
-import 'package:amgeca/View/clima_page.dart';
-import 'package:amgeca/View/reportes_page.dart';
-import 'package:amgeca/View/ajustes_page.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:provider/provider.dart';
+import 'package:amgeca/providers/auth_provider.dart';
+import 'package:amgeca/providers/auth_wrapper.dart';
+import 'package:amgeca/View/ventas_page.dart';
+import 'package:amgeca/View/auth/login_page.dart';
 
 void main() async {
-  // Initialize sqlfiteFfi only for desktop platforms
-  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-    databaseFactory = databaseFactoryFfi;
-  }
-  runApp(const MainApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const MyApp());
 }
 
-class MainApp extends StatelessWidget {
-  const MainApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'AMGeCCA',
-      theme: ThemeData(primarySwatch: Colors.green, useMaterial3: true),
-      debugShowCheckedModeBanner: false,
-      home: const TabNavigationPage(),
+    return MultiProvider(
+      providers: [ChangeNotifierProvider(create: (_) => AuthProvider())],
+      child: MaterialApp(
+        title: 'AMGECA',
+        theme: ThemeData(
+          primarySwatch: Colors.green,
+          visualDensity: VisualDensity.adaptivePlatformDensity,
+        ),
+        home: const AuthWrapper(),
+        debugShowCheckedModeBanner: false,
+        // Rutas de la aplicación
+        routes: {
+          '/ventas': (context) => const VentasPage(),
+          '/reportes-ventas': (context) => const ReportesVentasPlaceholder(),
+          '/inventario': (context) => const InventarioPlaceholder(),
+          '/login': (context) => const LoginPage(),
+        },
+      ),
     );
   }
 }
 
-class TabNavigationPage extends StatefulWidget {
-  const TabNavigationPage({super.key});
-
-  @override
-  State<TabNavigationPage> createState() => _TabNavigationPageState();
-}
-
-class _TabNavigationPageState extends State<TabNavigationPage> {
-  int _selectedIndex = 0;
-
-  final List<Widget> _pages = const [
-    DashboardPage(),
-    CultivosListPage(),
-    ClimaPage(),
-    ReportesPage(),
-    AjustesPage(),
-  ];
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
+// Placeholders temporales (crea páginas reales después)
+class ReportesVentasPlaceholder extends StatelessWidget {
+  const ReportesVentasPlaceholder({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: _pages),
-      bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.agriculture),
-            label: 'Cultivos',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.cloud), label: 'Clima'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart),
-            label: 'Reportes',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Ajustes'),
-        ],
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        type: BottomNavigationBarType.fixed,
+      appBar: AppBar(
+        title: const Text(
+          'Reportes de Ventas',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.green[800],
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.analytics, size: 80, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'Reportes de Ventas',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text('En desarrollo...'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class InventarioPlaceholder extends StatelessWidget {
+  const InventarioPlaceholder({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Inventario', style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.green[800],
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.inventory, size: 80, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'Gestión de Inventario',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text('En desarrollo...'),
+          ],
+        ),
       ),
     );
   }
