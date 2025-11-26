@@ -18,7 +18,7 @@ class BasedatoHelper {
 
     _database = await openDatabase(
       path,
-      version: 2, // Incrementar versión para agregar tabla ventas
+      version: 3, // 🔥 Incrementar versión para agregar tablas de chat
       onCreate: (db, version) async {
         await db.execute(
           'CREATE TABLE mitabla (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)',
@@ -36,7 +36,6 @@ class BasedatoHelper {
           'CREATE TABLE cultivos (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT NOT NULL, tipoSuelo TEXT NOT NULL, area REAL NOT NULL, fechaSiembra TEXT NOT NULL, fechaCosecha TEXT, estado TEXT NOT NULL, notas TEXT, imagenUrl TEXT, tipoId INTEGER, categoriaId INTEGER, tipoRiego TEXT, cantidadCosechada REAL, ingresos REAL, egresos REAL, isRisk INTEGER DEFAULT 0, riskReason TEXT, riskType TEXT, riskDate TEXT)',
         );
 
-        // Crear tabla de usuarios
         await db.execute('''
           CREATE TABLE usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,7 +47,6 @@ class BasedatoHelper {
           )
         ''');
 
-        // Crear tabla de ventas
         await db.execute('''
           CREATE TABLE ventas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,10 +62,34 @@ class BasedatoHelper {
             FOREIGN KEY (cultivoId) REFERENCES cultivos (id) ON DELETE CASCADE
           )
         ''');
+
+        // 🆕 TABLAS DE CHAT
+        await db.execute('''
+          CREATE TABLE conversaciones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            titulo TEXT NOT NULL,
+            fechaCreacion TEXT NOT NULL,
+            ultimaActualizacion TEXT NOT NULL,
+            mensajesCount INTEGER DEFAULT 0
+          )
+        ''');
+
+        await db.execute('''
+          CREATE TABLE mensajes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            conversacionId INTEGER NOT NULL,
+            tipo TEXT NOT NULL,
+            contenido TEXT NOT NULL,
+            fecha TEXT NOT NULL,
+            archivoPath TEXT,
+            archivoNombre TEXT,
+            archivoTipo TEXT,
+            FOREIGN KEY (conversacionId) REFERENCES conversaciones (id) ON DELETE CASCADE
+          )
+        ''');
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
-          // Crear tabla de ventas si no existe
           await db.execute('''
             CREATE TABLE IF NOT EXISTS ventas (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,9 +106,35 @@ class BasedatoHelper {
             )
           ''');
         }
+
+        if (oldVersion < 3) {
+          // 🆕 Crear tablas de chat
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS conversaciones (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              titulo TEXT NOT NULL,
+              fechaCreacion TEXT NOT NULL,
+              ultimaActualizacion TEXT NOT NULL,
+              mensajesCount INTEGER DEFAULT 0
+            )
+          ''');
+
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS mensajes (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              conversacionId INTEGER NOT NULL,
+              tipo TEXT NOT NULL,
+              contenido TEXT NOT NULL,
+              fecha TEXT NOT NULL,
+              archivoPath TEXT,
+              archivoNombre TEXT,
+              archivoTipo TEXT,
+              FOREIGN KEY (conversacionId) REFERENCES conversaciones (id) ON DELETE CASCADE
+            )
+          ''');
+        }
       },
       onOpen: (db) async {
-        // Ensure the tables exist if the DB was created earlier without them
         await db.execute(
           'CREATE TABLE IF NOT EXISTS tipos_cultivo (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT NOT NULL)',
         );
@@ -105,7 +153,6 @@ class BasedatoHelper {
           'riskType TEXT, riskDate TEXT)',
         );
 
-        // Crear tabla de usuarios si no existe
         await db.execute('''
           CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -117,7 +164,6 @@ class BasedatoHelper {
           )
         ''');
 
-        // Crear tabla de ventas si no existe
         await db.execute('''
           CREATE TABLE IF NOT EXISTS ventas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -134,7 +180,31 @@ class BasedatoHelper {
           )
         ''');
 
-        // Agregar columnas de riesgo si no existen
+        // 🆕 Crear tablas de chat si no existen
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS conversaciones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            titulo TEXT NOT NULL,
+            fechaCreacion TEXT NOT NULL,
+            ultimaActualizacion TEXT NOT NULL,
+            mensajesCount INTEGER DEFAULT 0
+          )
+        ''');
+
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS mensajes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            conversacionId INTEGER NOT NULL,
+            tipo TEXT NOT NULL,
+            contenido TEXT NOT NULL,
+            fecha TEXT NOT NULL,
+            archivoPath TEXT,
+            archivoNombre TEXT,
+            archivoTipo TEXT,
+            FOREIGN KEY (conversacionId) REFERENCES conversaciones (id) ON DELETE CASCADE
+          )
+        ''');
+
         final columns = await db.rawQuery('PRAGMA table_info(cultivos)');
         final columnNames = columns.map((c) => c['name'] as String).toList();
 
@@ -153,29 +223,109 @@ class BasedatoHelper {
           await db.execute('ALTER TABLE cultivos ADD COLUMN riskDate TEXT');
         }
 
-        // Agregar columnas si no existen (migración)
         try {
           await db.execute(
             'ALTER TABLE cultivos ADD COLUMN cantidadCosechada REAL',
           );
-        } catch (e) {
-          // Columna ya existe
-        }
+        } catch (e) {}
         try {
           await db.execute('ALTER TABLE cultivos ADD COLUMN ingresos REAL');
-        } catch (e) {
-          // Columna ya existe
-        }
+        } catch (e) {}
         try {
           await db.execute('ALTER TABLE cultivos ADD COLUMN egresos REAL');
-        } catch (e) {
-          // Columna ya existe
-        }
+        } catch (e) {}
       },
     );
 
     return _database!;
   }
+
+  // ========== 🆕 MÉTODOS DE CONVERSACIONES ==========
+
+  Future<int> crearConversacion(String titulo) async {
+    final db = await openDataBase();
+    final now = DateTime.now().toIso8601String();
+
+    return await db.insert('conversaciones', {
+      'titulo': titulo,
+      'fechaCreacion': now,
+      'ultimaActualizacion': now,
+      'mensajesCount': 0,
+    });
+  }
+
+  Future<List<Map<String, Object?>>> getAllConversaciones() async {
+    final db = await openDataBase();
+    return await db.query(
+      'conversaciones',
+      orderBy: 'ultimaActualizacion DESC',
+    );
+  }
+
+  Future<int> actualizarTituloConversacion(int id, String nuevoTitulo) async {
+    final db = await openDataBase();
+    return await db.update(
+      'conversaciones',
+      {
+        'titulo': nuevoTitulo,
+        'ultimaActualizacion': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<int> eliminarConversacion(int id) async {
+    final db = await openDataBase();
+    return await db.delete('conversaciones', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ========== 🆕 MÉTODOS DE MENSAJES ==========
+
+  Future<int> insertarMensaje(Map<String, Object?> mensaje) async {
+    final db = await openDataBase();
+
+    final conversacionId = mensaje['conversacionId'] as int;
+
+    final mensajeId = await db.insert('mensajes', mensaje);
+
+    await db.rawUpdate(
+      '''
+      UPDATE conversaciones 
+      SET mensajesCount = mensajesCount + 1,
+          ultimaActualizacion = ?
+      WHERE id = ?
+    ''',
+      [DateTime.now().toIso8601String(), conversacionId],
+    );
+
+    return mensajeId;
+  }
+
+  Future<List<Map<String, Object?>>> getMensajes(int conversacionId) async {
+    final db = await openDataBase();
+    return await db.query(
+      'mensajes',
+      where: 'conversacionId = ?',
+      whereArgs: [conversacionId],
+      orderBy: 'fecha ASC',
+    );
+  }
+
+  Future<Map<String, Object?>?> getUltimoMensaje(int conversacionId) async {
+    final db = await openDataBase();
+    final result = await db.query(
+      'mensajes',
+      where: 'conversacionId = ?',
+      whereArgs: [conversacionId],
+      orderBy: 'fecha DESC',
+      limit: 1,
+    );
+
+    return result.isNotEmpty ? result.first : null;
+  }
+
+  // ========== MÉTODOS EXISTENTES ==========
 
   Future<int> addData(Map<String, Object?> row) async {
     final db = await openDataBase();
@@ -186,7 +336,6 @@ class BasedatoHelper {
     );
   }
 
-  // --- Cultivo specific methods ---
   Future<int> insertCultivo(Map<String, Object?> cultivoRow) async {
     final db = await openDataBase();
     return await db.insert(
@@ -221,7 +370,6 @@ class BasedatoHelper {
     return await db.delete('cultivos', where: 'id = ?', whereArgs: [id]);
   }
 
-  // --- TipoCultivo methods ---
   Future<int> insertTipoCultivo(Map<String, Object?> row) async {
     final db = await openDataBase();
     return await db.insert(
@@ -241,7 +389,6 @@ class BasedatoHelper {
     return await db.delete('tipos_cultivo', where: 'id = ?', whereArgs: [id]);
   }
 
-  // --- Categoria methods ---
   Future<int> insertCategoria(Map<String, Object?> row) async {
     final db = await openDataBase();
     return await db.insert(
@@ -261,9 +408,6 @@ class BasedatoHelper {
     return await db.delete('categorias', where: 'id = ?', whereArgs: [id]);
   }
 
-  // ========== MÉTODOS DE VENTAS ==========
-
-  // Insertar nueva venta
   Future<int> insertVenta(Map<String, Object?> ventaRow) async {
     final db = await openDataBase();
     return await db.insert(
@@ -273,32 +417,27 @@ class BasedatoHelper {
     );
   }
 
-  // Obtener todas las ventas
   Future<List<Map<String, Object?>>> getAllVentas() async {
     final db = await openDataBase();
     return await db.query('ventas', orderBy: 'fecha DESC');
   }
 
-  // Actualizar una venta
   Future<int> updateVenta(int id, Map<String, Object?> row) async {
     final db = await openDataBase();
     return await db.update('ventas', row, where: 'id = ?', whereArgs: [id]);
   }
 
-  // Eliminar una venta
   Future<int> deleteVenta(int id) async {
     final db = await openDataBase();
     return await db.delete('ventas', where: 'id = ?', whereArgs: [id]);
   }
 
-  // Obtener total de ventas
   Future<double> getTotalVentas() async {
     final db = await openDataBase();
     final result = await db.rawQuery('SELECT SUM(total) as total FROM ventas');
     return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
 
-  // Obtener ventas por cultivo
   Future<List<Map<String, Object?>>> getVentasPorCultivo(int cultivoId) async {
     final db = await openDataBase();
     return await db.query(
@@ -309,7 +448,6 @@ class BasedatoHelper {
     );
   }
 
-  // Obtener ventas por rango de fechas
   Future<List<Map<String, Object?>>> getVentasPorFechas(
     String fechaInicio,
     String fechaFin,
@@ -323,9 +461,6 @@ class BasedatoHelper {
     );
   }
 
-  // ========== MÉTODOS DE AUTENTICACIÓN ==========
-
-  // Registrar un nuevo usuario
   Future<Map<String, dynamic>> registrarUsuario(
     String nombre,
     String correo,
@@ -333,7 +468,6 @@ class BasedatoHelper {
   ) async {
     final db = await openDataBase();
 
-    // Verificar si el correo ya existe
     final existingUser = await db.query(
       'usuarios',
       where: 'correo = ?',
@@ -344,10 +478,8 @@ class BasedatoHelper {
       throw Exception('Ya existe un usuario con este correo');
     }
 
-    // Crear hash de la contraseña
     final passwordHash = _hashPassword(password);
 
-    // Insertar nuevo usuario
     final id = await db.insert('usuarios', {
       'nombre': nombre,
       'correo': correo,
@@ -357,14 +489,12 @@ class BasedatoHelper {
     return {'id': id, 'nombre': nombre, 'correo': correo};
   }
 
-  // Iniciar sesión
   Future<Map<String, dynamic>> iniciarSesion(
     String correo,
     String password,
   ) async {
     final db = await openDataBase();
 
-    // Buscar usuario por correo
     final result = await db.query(
       'usuarios',
       where: 'correo = ?',
@@ -378,7 +508,6 @@ class BasedatoHelper {
     final user = result.first;
     final storedHash = user['passwordHash'] as String;
 
-    // Verificar contraseña
     if (!_verifyPassword(password, storedHash)) {
       throw Exception('Usuario o contraseña incorrectos');
     }
@@ -390,23 +519,17 @@ class BasedatoHelper {
     };
   }
 
-  // Generar token de recuperación
   Future<void> generarTokenRecuperacion(String correo) async {
     final db = await openDataBase();
 
-    // Verificar si el correo existe
     final result = await db.query(
       'usuarios',
       where: 'correo = ?',
       whereArgs: [correo],
     );
 
-    if (result.isEmpty) {
-      // No revelamos que el correo no existe por seguridad
-      return;
-    }
+    if (result.isEmpty) return;
 
-    // Generar token de 6 dígitos
     final token = (100000 + DateTime.now().millisecondsSinceEpoch % 900000)
         .toString()
         .substring(0, 6);
@@ -414,7 +537,6 @@ class BasedatoHelper {
         .add(const Duration(hours: 1))
         .millisecondsSinceEpoch;
 
-    // Actualizar usuario con token y tiempo de expiración
     await db.update(
       'usuarios',
       {'resetToken': token, 'resetTokenExpiry': expiryTime},
@@ -422,11 +544,9 @@ class BasedatoHelper {
       whereArgs: [correo],
     );
 
-    // Enviar correo con el token (implementación simulada)
     print('Token de recuperación para $correo: $token');
   }
 
-  // Verificar token de recuperación
   Future<bool> verificarTokenRecuperacion(String correo, String token) async {
     final db = await openDataBase();
 
@@ -444,19 +564,15 @@ class BasedatoHelper {
 
     if (storedToken == null || expiryTime == null) return false;
 
-    // Verificar si el token coincide y no ha expirado
     return storedToken == token &&
         DateTime.now().millisecondsSinceEpoch < expiryTime;
   }
 
-  // Actualizar contraseña
   Future<void> actualizarContrasena(String correo, String nuevaPassword) async {
     final db = await openDataBase();
 
-    // Generar nuevo hash
     final newHash = _hashPassword(nuevaPassword);
 
-    // Actualizar contraseña y limpiar token
     await db.update(
       'usuarios',
       {'passwordHash': newHash, 'resetToken': null, 'resetTokenExpiry': null},
@@ -465,7 +581,6 @@ class BasedatoHelper {
     );
   }
 
-  // Métodos auxiliares para el manejo de contraseñas
   String _hashPassword(String password) {
     final bytes = utf8.encode(password);
     final digest = sha256.convert(bytes);

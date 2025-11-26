@@ -21,19 +21,25 @@ dependencies:
   shared_preferences: ^2.2.2
   crypto: ^3.0.3
 
-  # 🔥 IA OFFLINE – Versiones actualizadas y compatibles
+  # IA OFFLINE
   image: ^4.1.7
   tflite_flutter: ^0.11.0
 
   # Para tomar/seleccionar fotos
-  image_picker: ^1.0.4
+  image_picker: ^1.0.7  # 🔄 ACTUALIZADO de 1.0.4 a 1.0.7
   path_provider: ^2.1.1
 
-  # Para seleccionar archivos (PDF, Word, Excel, etc)
+  # Para seleccionar archivos
   file_picker: ^8.0.0+1
 
-  #DeepSeek
+  # DeepSeek
   http: ^1.1.1
+
+  # 🆕 CLIMA Y GPS
+  geocoding: ^3.0.0 
+  geolocator: ^11.0.0
+  permission_handler: ^11.0.1
+  flutter_local_notifications: ^17.0.0
 
 dev_dependencies:
   flutter_test:
@@ -51,21 +57,15 @@ flutter:
   uses-material-design: true
 
   assets:
-    # Tomate
     - assets/modelo_tomate.tflite
     - assets/labels_tomate.txt
-    # Plátano
     - assets/modelo_platano.tflite
     - assets/labels_platano.txt
-    # Café
     - assets/modelo_cafe.tflite
     - assets/labels_cafe.txt
-    # Cacao
     - assets/modelo_cacao.tflite
     - assets/labels_cacao.txt
-    # Maíz
     - assets/modelo_maiz.tflite
     - assets/labels_maiz.txt
-    # Arroz
     - assets/modelo_arroz.tflite
     - assets/labels_arroz.txt

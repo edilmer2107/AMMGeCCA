@@ -45,5 +45,21 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<!-- 🆕 PERMISOS DE UBICACIÓN -->
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Necesitamos tu ubicación para obtener el clima de tu zona</string>
+    
+    <key>NSLocationAlwaysUsageDescription</key>
+    <string>Necesitamos tu ubicación para obtener el clima de tu zona</string>
+    
+    <!-- RESTO DE TU CONFIGURACIÓN -->
+	<key>NSCameraUsageDescription</key>
+<string>Necesitamos acceso a la cámara para actualizar tu foto de perfil</string>
+<key>NSPhotoLibraryUsageDescription</key>
+<string>Necesitamos acceso a tus fotos para seleccionar tu imagen de perfil</string>
+<key>NSPhotoLibraryAddUsageDescription</key>
+<string>Necesitamos acceso para guardar fotos en tu galería</string>
+
 </dict>
 </plist>

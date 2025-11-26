@@ -6,21 +6,18 @@ class Cultivo {
   final double area;
   final String fechaSiembra;
   final String? fechaCosecha;
-  String estado; // ejemplo: "ACTIVO", "COSECHADO", "EN_RIESGO"
+  String estado; // "activo", "inactivo", "cosechado", "en_riesgo"
   final String? notas;
-  final String? imagenUrl;
-  final int? tipoId; // FK to tipos_cultivo
-  final int? categoriaId; // FK to categorias
+  final String? imagenUrl; // Ruta local de la imagen
+  final int? tipoId;
+  final int? categoriaId;
   final String tipoRiego;
   final double? cantidadCosechada;
   final double? ingresos;
   final double? egresos;
-
-  // NUEVOS CAMPOS para riesgo
-  bool enRiesgo;
   String? razonRiesgo;
-  String? tipoRiesgo; // Climático, Plagas, Enfermedades, Suelo, Falta de agua
-  String? fechaRiesgo; // ISO string, e.g. "2025-11-21"
+  String? tipoRiesgo;
+  String? fechaRiesgo;
 
   Cultivo({
     this.id,
@@ -38,12 +35,21 @@ class Cultivo {
     this.cantidadCosechada,
     this.ingresos,
     this.egresos,
-    // risk defaults:
-    this.enRiesgo = false,
     this.razonRiesgo,
     this.tipoRiesgo,
     this.fechaRiesgo,
   });
+
+  // Estados válidos
+  static const String ESTADO_ACTIVO = 'activo';
+  static const String ESTADO_INACTIVO = 'inactivo';
+  static const String ESTADO_COSECHADO = 'cosechado';
+  static const String ESTADO_EN_RIESGO = 'en_riesgo';
+
+  bool get esActivo => estado == ESTADO_ACTIVO;
+  bool get esInactivo => estado == ESTADO_INACTIVO;
+  bool get esCosechado => estado == ESTADO_COSECHADO;
+  bool get esEnRiesgo => estado == ESTADO_EN_RIESGO;
 
   factory Cultivo.fromMap(Map<String, dynamic> map) {
     return Cultivo(
@@ -53,7 +59,7 @@ class Cultivo {
       area: (map['area'] is num) ? (map['area'] as num).toDouble() : 0.0,
       fechaSiembra: map['fechaSiembra'] as String? ?? '',
       fechaCosecha: map['fechaCosecha'] as String?,
-      estado: map['estado'] as String? ?? 'ACTIVO',
+      estado: (map['estado'] as String? ?? 'activo').toLowerCase(),
       notas: map['notas'] as String?,
       imagenUrl: map['imagenUrl'] as String?,
       tipoId: map['tipoId'] as int?,
@@ -68,12 +74,9 @@ class Cultivo {
       egresos: map['egresos'] != null
           ? (map['egresos'] as num).toDouble()
           : null,
-      enRiesgo: (map['enRiesgo'] == null)
-          ? false
-          : ((map['enRiesgo'] as int) == 1),
-      razonRiesgo: map['razonRiesgo'] as String?,
-      tipoRiesgo: map['tipoRiesgo'] as String?,
-      fechaRiesgo: map['fechaRiesgo'] as String?,
+      razonRiesgo: map['riskReason'] as String?,
+      tipoRiesgo: map['riskType'] as String?,
+      fechaRiesgo: map['riskDate'] as String?,
     );
   }
 
@@ -85,7 +88,7 @@ class Cultivo {
       'area': area,
       'fechaSiembra': fechaSiembra,
       'fechaCosecha': fechaCosecha,
-      'estado': estado,
+      'estado': estado.toLowerCase(),
       'notas': notas,
       'imagenUrl': imagenUrl,
       'tipoId': tipoId,
@@ -94,11 +97,11 @@ class Cultivo {
       'cantidadCosechada': cantidadCosechada,
       'ingresos': ingresos,
       'egresos': egresos,
-      // campos de riesgo
-      'enRiesgo': enRiesgo ? 1 : 0,
-      'razonRiesgo': razonRiesgo,
-      'tipoRiesgo': tipoRiesgo,
-      'fechaRiesgo': fechaRiesgo,
+      'riskReason': razonRiesgo,
+      'riskType': tipoRiesgo,
+      'riskDate': fechaRiesgo,
+      // Mantener compatibilidad con el campo isRisk
+      'isRisk': estado == ESTADO_EN_RIESGO ? 1 : 0,
     };
   }
 }

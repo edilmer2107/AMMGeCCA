@@ -9,6 +9,8 @@ import 'package:path_provider/path_provider.dart';
 import 'recomendaciones_helper.dart';
 import '../services/deepseek_chat.dart';
 import 'package:file_picker/file_picker.dart';
+import '../Data/basedato_helper.dart';
+import 'historial_conversaciones_page.dart';
 
 // Definir cultivos disponibles
 class Cultivo {
@@ -656,10 +658,15 @@ class _ReportesPageState extends State<ReportesPage> {
           Positioned(
             right: 16,
             bottom: 16,
-            child: FloatingActionButton(
+            child: FloatingActionButton.extended(
+              heroTag: 'chatbot_fab',
               onPressed: _mostrarChatBot,
               backgroundColor: Colors.deepPurple,
-              child: const Icon(Icons.reviews_rounded, color: Colors.white),
+              icon: const Icon(Icons.reviews_rounded, color: Colors.white),
+              label: const Text(
+                "ChatBot",
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ),
         ],
@@ -669,8 +676,11 @@ class _ReportesPageState extends State<ReportesPage> {
 }
 
 // Modal del ChatBot con soporte de archivos
+// 🔥 DESDE LÍNEA 765 - Modal del ChatBot con historial
 class ChatBotModal extends StatefulWidget {
-  const ChatBotModal({Key? key}) : super(key: key);
+  final int? conversacionId;
+
+  const ChatBotModal({Key? key, this.conversacionId}) : super(key: key);
 
   @override
   State<ChatBotModal> createState() => _ChatBotModalState();
@@ -678,11 +688,94 @@ class ChatBotModal extends StatefulWidget {
 
 class _ChatBotModalState extends State<ChatBotModal> {
   final DeepSeekChat bot = DeepSeekChat();
+  final BasedatoHelper db = BasedatoHelper.instance;
   final TextEditingController controller = TextEditingController();
   final ScrollController scrollController = ScrollController();
+
   List<Map<String, dynamic>> messages = [];
   bool isLoading = false;
   bool showAttachmentMenu = false;
+  int? conversacionActualId;
+  bool cargandoHistorial = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _inicializarConversacion();
+  }
+
+  Future<void> _inicializarConversacion() async {
+    if (widget.conversacionId != null) {
+      setState(() => cargandoHistorial = true);
+      conversacionActualId = widget.conversacionId;
+      await _cargarMensajes();
+      setState(() => cargandoHistorial = false);
+    } else {
+      conversacionActualId = await db.crearConversacion('Nueva conversación');
+    }
+  }
+
+  Future<void> _cargarMensajes() async {
+    if (conversacionActualId == null) return;
+
+    final mensajesDb = await db.getMensajes(conversacionActualId!);
+
+    setState(() {
+      messages = mensajesDb.map((msg) {
+        final tipo = msg['tipo'] as String;
+
+        if (tipo == 'user_text') {
+          return {'user': msg['contenido'], 'type': 'text'};
+        } else if (tipo == 'bot_text') {
+          return {'bot': msg['contenido'], 'type': 'text'};
+        } else if (tipo == 'user_image') {
+          return {
+            'user': msg['archivoNombre'] ?? '📷 Imagen',
+            'type': 'image',
+            'file': File(msg['archivoPath'] as String),
+          };
+        } else if (tipo == 'user_document') {
+          return {
+            'user': msg['archivoNombre'] ?? '📄 Documento',
+            'type': 'document',
+            'file': File(msg['archivoPath'] as String),
+            'fileName': msg['archivoNombre'],
+          };
+        }
+
+        return {'bot': msg['contenido'], 'type': 'text'};
+      }).toList();
+    });
+
+    _scrollToBottom();
+  }
+
+  Future<void> _guardarMensaje(
+    String tipo,
+    String contenido, {
+    String? archivoPath,
+    String? archivoNombre,
+    String? archivoTipo,
+  }) async {
+    if (conversacionActualId == null) return;
+
+    await db.insertarMensaje({
+      'conversacionId': conversacionActualId,
+      'tipo': tipo,
+      'contenido': contenido,
+      'fecha': DateTime.now().toIso8601String(),
+      'archivoPath': archivoPath,
+      'archivoNombre': archivoNombre,
+      'archivoTipo': archivoTipo,
+    });
+
+    if (messages.length == 1 && tipo == 'user_text') {
+      final titulo = contenido.length > 50
+          ? '${contenido.substring(0, 50)}...'
+          : contenido;
+      await db.actualizarTituloConversacion(conversacionActualId!, titulo);
+    }
+  }
 
   @override
   void dispose() {
@@ -696,19 +789,23 @@ class _ChatBotModalState extends State<ChatBotModal> {
     if (text.isEmpty) return;
 
     setState(() {
-      messages.add({"user": text, "type": "text"});
+      messages.add({'user': text, 'type': 'text'});
       isLoading = true;
     });
 
     controller.clear();
     _scrollToBottom();
 
+    await _guardarMensaje('user_text', text);
+
     String reply = await bot.sendMessage(text);
 
     setState(() {
-      messages.add({"bot": reply, "type": "text"});
+      messages.add({'bot': reply, 'type': 'text'});
       isLoading = false;
     });
+
+    await _guardarMensaje('bot_text', reply);
     _scrollToBottom();
   }
 
@@ -718,31 +815,43 @@ class _ChatBotModalState extends State<ChatBotModal> {
     final picker = ImagePicker();
     final XFile? image = await picker.pickImage(
       source: ImageSource.gallery,
-      maxWidth: 1024,
-      maxHeight: 1024,
-      imageQuality: 85,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 70,
     );
 
     if (image != null) {
+      final imageFile = File(image.path);
+
       setState(() {
         messages.add({
-          "user": "📷 Imagen adjunta",
-          "type": "image",
-          "file": File(image.path),
+          'user': '📷 Imagen adjunta',
+          'type': 'image',
+          'file': imageFile,
         });
         isLoading = true;
       });
       _scrollToBottom();
 
+      await _guardarMensaje(
+        'user_image',
+        '📷 Imagen adjunta',
+        archivoPath: image.path,
+        archivoNombre: '📷 Imagen',
+        archivoTipo: 'image',
+      );
+
       String reply = await bot.sendMessageWithImage(
-        "Analiza esta imagen relacionada con cultivos agrícolas y dame información relevante",
-        File(image.path),
+        'Analiza esta imagen relacionada con cultivos agrícolas',
+        imageFile,
       );
 
       setState(() {
-        messages.add({"bot": reply, "type": "text"});
+        messages.add({'bot': reply, 'type': 'text'});
         isLoading = false;
       });
+
+      await _guardarMensaje('bot_text', reply);
       _scrollToBottom();
     }
   }
@@ -761,25 +870,35 @@ class _ChatBotModalState extends State<ChatBotModal> {
 
       setState(() {
         messages.add({
-          "user": "📄 $fileName",
-          "type": "document",
-          "file": file,
-          "fileName": fileName,
+          'user': '📄 $fileName',
+          'type': 'document',
+          'file': file,
+          'fileName': fileName,
         });
         isLoading = true;
       });
       _scrollToBottom();
 
+      await _guardarMensaje(
+        'user_document',
+        '📄 Documento adjunto',
+        archivoPath: file.path,
+        archivoNombre: fileName,
+        archivoTipo: 'document',
+      );
+
       String reply = await bot.sendMessageWithDocument(
-        "He adjuntado un documento. Por favor analízalo y dame un resumen.",
+        'Analiza este documento',
         file,
         fileName,
       );
 
       setState(() {
-        messages.add({"bot": reply, "type": "text"});
+        messages.add({'bot': reply, 'type': 'text'});
         isLoading = false;
       });
+
+      await _guardarMensaje('bot_text', reply);
       _scrollToBottom();
     }
   }
@@ -790,31 +909,43 @@ class _ChatBotModalState extends State<ChatBotModal> {
     final picker = ImagePicker();
     final XFile? photo = await picker.pickImage(
       source: ImageSource.camera,
-      maxWidth: 1024,
-      maxHeight: 1024,
-      imageQuality: 85,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 70,
     );
 
     if (photo != null) {
+      final photoFile = File(photo.path);
+
       setState(() {
         messages.add({
-          "user": "📸 Foto tomada",
-          "type": "image",
-          "file": File(photo.path),
+          'user': '📸 Foto tomada',
+          'type': 'image',
+          'file': photoFile,
         });
         isLoading = true;
       });
       _scrollToBottom();
 
+      await _guardarMensaje(
+        'user_image',
+        '📸 Foto tomada',
+        archivoPath: photo.path,
+        archivoNombre: '📸 Foto',
+        archivoTipo: 'image',
+      );
+
       String reply = await bot.sendMessageWithImage(
-        "Analiza esta foto relacionada con cultivos agrícolas y dame información relevante",
-        File(photo.path),
+        'Analiza esta foto relacionada con cultivos agrícolas',
+        photoFile,
       );
 
       setState(() {
-        messages.add({"bot": reply, "type": "text"});
+        messages.add({'bot': reply, 'type': 'text'});
         isLoading = false;
       });
+
+      await _guardarMensaje('bot_text', reply);
       _scrollToBottom();
     }
   }
@@ -831,8 +962,30 @@ class _ChatBotModalState extends State<ChatBotModal> {
     });
   }
 
+  void _mostrarHistorial() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => HistorialConversacionesPage(
+          onSeleccionarConversacion: (conversacionId) {
+            Navigator.of(context).pop();
+            Navigator.of(context).pop();
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              isDismissible: true,
+              enableDrag: true,
+              builder: (context) =>
+                  ChatBotModal(conversacionId: conversacionId),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   Widget _buildMessage(Map<String, dynamic> msg, bool isBot) {
-    if (msg["type"] == "image" && !isBot) {
+    if (msg['type'] == 'image' && !isBot) {
       return Container(
         margin: const EdgeInsets.symmetric(vertical: 6),
         padding: const EdgeInsets.all(8),
@@ -844,23 +997,32 @@ class _ChatBotModalState extends State<ChatBotModal> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.file(
-                msg["file"],
-                height: 150,
-                width: 150,
-                fit: BoxFit.cover,
+            if (msg['file'] != null && File(msg['file'].path).existsSync())
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(
+                  msg['file'],
+                  height: 150,
+                  width: 150,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      height: 150,
+                      width: 150,
+                      color: Colors.grey[300],
+                      child: const Icon(Icons.broken_image, size: 50),
+                    );
+                  },
+                ),
               ),
-            ),
             const SizedBox(height: 4),
-            Text(msg["user"], style: const TextStyle(fontSize: 12)),
+            Text(msg['user'], style: const TextStyle(fontSize: 12)),
           ],
         ),
       );
     }
 
-    if (msg["type"] == "document" && !isBot) {
+    if (msg['type'] == 'document' && !isBot) {
       return Container(
         margin: const EdgeInsets.symmetric(vertical: 6),
         padding: const EdgeInsets.all(12),
@@ -880,7 +1042,7 @@ class _ChatBotModalState extends State<ChatBotModal> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                msg["user"],
+                msg['user'],
                 style: const TextStyle(fontSize: 14),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -902,7 +1064,7 @@ class _ChatBotModalState extends State<ChatBotModal> {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Text(
-        isBot ? msg["bot"] : msg["user"],
+        isBot ? msg['bot'] : msg['user'],
         style: const TextStyle(fontSize: 15),
       ),
     );
@@ -926,7 +1088,7 @@ class _ChatBotModalState extends State<ChatBotModal> {
         ),
         child: Column(
           children: [
-            // Header
+            // Header con botón hamburguesa
             Container(
               padding: const EdgeInsets.all(16),
               decoration: const BoxDecoration(
@@ -938,6 +1100,12 @@ class _ChatBotModalState extends State<ChatBotModal> {
               ),
               child: Row(
                 children: [
+                  IconButton(
+                    icon: const Icon(Icons.menu, color: Colors.white, size: 28),
+                    onPressed: _mostrarHistorial,
+                    tooltip: 'Historial de conversaciones',
+                  ),
+                  const SizedBox(width: 4),
                   const Icon(Icons.smart_toy, color: Colors.white, size: 28),
                   const SizedBox(width: 12),
                   const Expanded(
@@ -969,7 +1137,13 @@ class _ChatBotModalState extends State<ChatBotModal> {
 
             // Messages
             Expanded(
-              child: messages.isEmpty
+              child: cargandoHistorial
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: Colors.deepPurple,
+                      ),
+                    )
+                  : messages.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -996,14 +1170,34 @@ class _ChatBotModalState extends State<ChatBotModal> {
                             ),
                             textAlign: TextAlign.center,
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'También puedes enviar fotos 📷 o documentos 📄',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[400],
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 10,
                             ),
-                            textAlign: TextAlign.center,
+                            decoration: BoxDecoration(
+                              color: Colors.deepPurple[50],
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.history,
+                                  size: 18,
+                                  color: Colors.deepPurple,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Tus chats se guardan automáticamente',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.deepPurple[700],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -1042,7 +1236,7 @@ class _ChatBotModalState extends State<ChatBotModal> {
                         }
 
                         final msg = messages[index];
-                        final isBot = msg.containsKey("bot");
+                        final isBot = msg.containsKey('bot');
 
                         return Align(
                           alignment: isBot
@@ -1107,7 +1301,6 @@ class _ChatBotModalState extends State<ChatBotModal> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    // Botón de adjuntos
                     IconButton(
                       icon: Icon(
                         showAttachmentMenu ? Icons.close : Icons.add_circle,
@@ -1121,7 +1314,6 @@ class _ChatBotModalState extends State<ChatBotModal> {
                       },
                     ),
                     const SizedBox(width: 4),
-                    // Campo de texto
                     Expanded(
                       child: Container(
                         constraints: const BoxConstraints(maxHeight: 120),
@@ -1131,7 +1323,7 @@ class _ChatBotModalState extends State<ChatBotModal> {
                           keyboardType: TextInputType.multiline,
                           textInputAction: TextInputAction.send,
                           decoration: InputDecoration(
-                            hintText: "Escribe tu consulta...",
+                            hintText: 'Escribe tu consulta...',
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(24),
                               borderSide: BorderSide.none,
@@ -1148,7 +1340,6 @@ class _ChatBotModalState extends State<ChatBotModal> {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    // Botón de enviar
                     Container(
                       decoration: const BoxDecoration(
                         color: Colors.deepPurple,

@@ -1,3 +1,5 @@
+// lib/View/cultivos_list_page.dart
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:amgeca/classes/cultivo.dart';
 import 'package:amgeca/Data/basedato_helper.dart';
@@ -19,7 +21,7 @@ class _CultivosListPageState extends State<CultivosListPage> {
   late Future<List<Cultivo>> _cultivosFuture;
   Map<int, String> _tipoMap = {};
   Map<int, String> _categoriaMap = {};
-  String? _filtroActivo; // null = todos, 'activo', 'cosechado', 'en_riesgo'
+  String? _filtroActivo;
 
   @override
   void initState() {
@@ -108,6 +110,7 @@ class _CultivosListPageState extends State<CultivosListPage> {
       appBar: AppBar(
         title: const Text('Cultivos'),
         backgroundColor: Colors.green,
+        foregroundColor: Colors.white,
         elevation: 0,
         leading: const SizedBox(),
         actions: [
@@ -152,14 +155,17 @@ class _CultivosListPageState extends State<CultivosListPage> {
                     onPressed: () => _navigateToForm(),
                     icon: const Icon(Icons.add),
                     label: const Text('Crear Cultivo'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
                   ),
                 ],
               ),
             );
           }
 
-          // Calcular resumen
-          final registrados = cultivos.length;
+          final activos = cultivos.where((c) => c.estado == 'activo').length;
           final cosechados = cultivos
               .where((c) => c.estado == 'cosechado')
               .length;
@@ -170,7 +176,6 @@ class _CultivosListPageState extends State<CultivosListPage> {
           return SingleChildScrollView(
             child: Column(
               children: [
-                // Resumen de cultivos
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -187,60 +192,47 @@ class _CultivosListPageState extends State<CultivosListPage> {
                       Row(
                         children: [
                           Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4.0,
-                              ),
-                              child: _buildSummaryCard(
-                                '$registrados',
-                                'Registrados',
-                                Colors.cyan,
-                                onTap: () {
-                                  setState(() {
-                                    _filtroActivo = 'activo';
-                                    _loadCultivos();
-                                  });
-                                },
-                                isActive: _filtroActivo == 'activo',
-                              ),
+                            child: _buildSummaryCard(
+                              '$activos',
+                              'Activos',
+                              Colors.green,
+                              onTap: () {
+                                setState(() {
+                                  _filtroActivo = 'activo';
+                                  _loadCultivos();
+                                });
+                              },
+                              isActive: _filtroActivo == 'activo',
                             ),
                           ),
+                          const SizedBox(width: 8),
                           Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4.0,
-                              ),
-                              child: _buildSummaryCard(
-                                '$cosechados',
-                                'Cosechados',
-                                Colors.amber,
-                                onTap: () {
-                                  setState(() {
-                                    _filtroActivo = 'cosechado';
-                                    _loadCultivos();
-                                  });
-                                },
-                                isActive: _filtroActivo == 'cosechado',
-                              ),
+                            child: _buildSummaryCard(
+                              '$cosechados',
+                              'Cosechados',
+                              Colors.amber,
+                              onTap: () {
+                                setState(() {
+                                  _filtroActivo = 'cosechado';
+                                  _loadCultivos();
+                                });
+                              },
+                              isActive: _filtroActivo == 'cosechado',
                             ),
                           ),
+                          const SizedBox(width: 8),
                           Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4.0,
-                              ),
-                              child: _buildSummaryCard(
-                                '$enRiesgo',
-                                'En riesgo',
-                                Colors.pink,
-                                onTap: () {
-                                  setState(() {
-                                    _filtroActivo = 'en_riesgo';
-                                    _loadCultivos();
-                                  });
-                                },
-                                isActive: _filtroActivo == 'en_riesgo',
-                              ),
+                            child: _buildSummaryCard(
+                              '$enRiesgo',
+                              'En riesgo',
+                              Colors.orange,
+                              onTap: () {
+                                setState(() {
+                                  _filtroActivo = 'en_riesgo';
+                                  _loadCultivos();
+                                });
+                              },
+                              isActive: _filtroActivo == 'en_riesgo',
                             ),
                           ),
                         ],
@@ -248,13 +240,9 @@ class _CultivosListPageState extends State<CultivosListPage> {
                     ],
                   ),
                 ),
-                // Botón para mostrar todos los cultivos
                 if (_filtroActivo != null)
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16.0,
-                      vertical: 8.0,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: OutlinedButton.icon(
                       onPressed: () {
                         setState(() {
@@ -273,23 +261,16 @@ class _CultivosListPageState extends State<CultivosListPage> {
                       ),
                     ),
                   ),
-                // Lista de cultivos
                 ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 26),
+                  padding: const EdgeInsets.all(16),
                   itemCount: cultivos.length,
                   itemBuilder: (context, index) {
                     final cultivo = cultivos[index];
-                    final colorEstado = cultivo.estado == 'activo'
-                        ? Colors.green
-                        : cultivo.estado == 'cosechado'
-                        ? Colors.amber
-                        : Colors.red;
-                    return _buildCultivoCard(cultivo, colorEstado);
+                    return _buildCultivoCard(cultivo);
                   },
                 ),
-                const SizedBox(height: 20),
               ],
             ),
           );
@@ -299,7 +280,7 @@ class _CultivosListPageState extends State<CultivosListPage> {
         onPressed: () => _navigateToForm(),
         tooltip: 'Agregar Cultivo',
         backgroundColor: Colors.green,
-        child: const Icon(Icons.add),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
@@ -317,21 +298,18 @@ class _CultivosListPageState extends State<CultivosListPage> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          width: 100,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: isActive ? color.withOpacity(0.9) : color,
             borderRadius: BorderRadius.circular(16),
-            border: isActive ? Border.all(color: Colors.black, width: 2) : null,
-            boxShadow: isActive
-                ? [
-                    BoxShadow(
-                      color: color.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : null,
+            border: isActive ? Border.all(color: Colors.white, width: 3) : null,
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Column(
             children: [
@@ -340,17 +318,17 @@ class _CultivosListPageState extends State<CultivosListPage> {
                 style: const TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               Text(
                 label,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: Colors.black87,
+                  color: Colors.white,
                 ),
               ),
             ],
@@ -360,192 +338,295 @@ class _CultivosListPageState extends State<CultivosListPage> {
     );
   }
 
-  Widget _buildCultivoCard(Cultivo cultivo, Color colorEstado) {
-    final tipoNombre = _tipoMap[cultivo.tipoId ?? 0] ?? '-';
+  Widget _buildCultivoCard(Cultivo cultivo) {
+    final tipoNombre = _tipoMap[cultivo.tipoId ?? 0] ?? 'Sin tipo';
+    final categoriaNombre =
+        _categoriaMap[cultivo.categoriaId ?? 0] ?? 'Sin categoría';
+
+    Color colorEstado;
+    IconData iconEstado;
+
+    switch (cultivo.estado) {
+      case 'activo':
+        colorEstado = Colors.green;
+        iconEstado = Icons.check_circle;
+        break;
+      case 'cosechado':
+        colorEstado = Colors.amber;
+        iconEstado = Icons.agriculture;
+        break;
+      case 'en_riesgo':
+        colorEstado = Colors.orange;
+        iconEstado = Icons.warning;
+        break;
+      case 'inactivo':
+        colorEstado = Colors.grey;
+        iconEstado = Icons.cancel;
+        break;
+      default:
+        colorEstado = Colors.grey;
+        iconEstado = Icons.help;
+    }
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Encabezado: nombre e icono
-            Row(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Imagen del cultivo
+          if (cultivo.imagenUrl != null &&
+              File(cultivo.imagenUrl!).existsSync())
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+              child: Image.file(
+                File(cultivo.imagenUrl!),
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            ),
+
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.agriculture, color: Colors.green, size: 28),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        cultivo.nombre,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            cultivo.nombre,
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$tipoNombre • $categoriaNombre',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colorEstado,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(iconEstado, size: 16, color: Colors.white),
+                          const SizedBox(width: 4),
+                          Text(
+                            cultivo.estado.toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildInfoChip(
+                        Icons.calendar_today,
+                        'Fecha Siembra',
+                        cultivo.fechaSiembra,
+                        Colors.blue,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildInfoChip(
+                        Icons.event_available,
+                        'Cosecha Estimada',
+                        cultivo.fechaCosecha ?? 'N/A',
+                        Colors.purple,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildInfoChip(
+                        Icons.straighten,
+                        'Área',
+                        '${cultivo.area} m²',
+                        Colors.teal,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildInfoChip(
+                        Icons.water,
+                        'Riego',
+                        cultivo.tipoRiego,
+                        Colors.cyan,
+                      ),
+                    ),
+                  ],
+                ),
+                if (cultivo.notas != null && cultivo.notas!.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.notes, size: 16, color: Colors.grey[600]),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            cultivo.notas!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[700],
+                              fontStyle: FontStyle.italic,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          if (cultivo.estado == 'activo') {
+                            final result = await Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    CosechaFormPage(cultivo: cultivo),
+                              ),
+                            );
+                            if (result == true) {
+                              setState(() => _loadCultivos());
+                            }
+                          } else {
+                            await BasedatoHelper.instance.updateEstado(
+                              cultivo.id!,
+                              'activo',
+                            );
+                            setState(() => _loadCultivos());
+                          }
+                        },
+                        icon: Icon(
+                          cultivo.estado == 'activo'
+                              ? Icons.agriculture
+                              : Icons.restart_alt,
+                          size: 18,
+                        ),
+                        label: Text(
+                          cultivo.estado == 'activo' ? 'Cosechar' : 'Activar',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
-                      Text(
-                        tipoNombre,
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colorEstado,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    cultivo.estado.toUpperCase(),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
                     ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Fechas
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Siembra:',
-                      style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-                    ),
-                    Text(
-                      cultivo.fechaSiembra,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: () => _navigateToForm(cultivo: cultivo),
+                      icon: const Icon(Icons.edit),
+                      color: Colors.blue,
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.blue[50],
                       ),
                     ),
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      'Cosecha:',
-                      style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-                    ),
-                    Text(
-                      cultivo.fechaCosecha ?? 'Por definir',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                    IconButton(
+                      onPressed: () => _deleteCultivo(cultivo.id!),
+                      icon: const Icon(Icons.delete),
+                      color: Colors.red,
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.red[50],
                       ),
                     ),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            // Notas
-            if (cultivo.notas != null && cultivo.notas!.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(
-                  cultivo.notas!,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                    fontStyle: FontStyle.italic,
-                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoChip(
+    IconData icon,
+    String label,
+    String value,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: color,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-            // Botones de acción
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () async {
-                      if (cultivo.estado == 'activo') {
-                        // Abrir formulario de cosecha
-                        final result = await Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                CosechaFormPage(cultivo: cultivo),
-                          ),
-                        );
-                        if (result == true) {
-                          setState(() => _loadCultivos());
-                        }
-                      } else {
-                        // Si no está activo, marcar como activo
-                        BasedatoHelper.instance.updateEstado(
-                          cultivo.id!,
-                          'activo',
-                        );
-                        setState(() => _loadCultivos());
-                      }
-                    },
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.green),
-                    ),
-                    child: Text(
-                      cultivo.estado == 'activo'
-                          ? 'Marcar cosechado'
-                          : 'Marcar activo',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.green),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 5),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.of(context)
-                          .push(
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  CultivoFormPage(cultivo: cultivo),
-                            ),
-                          )
-                          .then((_) {
-                            // Recargar la lista después de marcar el riesgo
-                            _loadCultivos();
-                          });
-                    },
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.red),
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'Marcar riesgo',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.red),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                IconButton(
-                  icon: const Icon(Icons.edit, color: Colors.green),
-                  onPressed: () => _navigateToForm(cultivo: cultivo),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: () => _deleteCultivo(cultivo.id!),
-                ),
-              ],
-            ),
-          ],
-        ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }
